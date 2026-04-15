@@ -1334,6 +1334,7 @@ export default function AdminPropertiesPage() {
                       <div className="space-y-4">
                         <ValidatedInput
                           value={formData.agent?.name}
+                          label='agent name'
                           onChange={e => handleAgentFieldChange('name', e.target.value)}
                           onBlur={() => {
                             setTouched(prev => ({ ...prev, 'agent.name': true }));
@@ -1345,6 +1346,7 @@ export default function AdminPropertiesPage() {
                         <div className="grid grid-cols-2 gap-4">
                           <ValidatedInput
                             type="tel"
+                            label='telephone'
                             value={formData.agent?.phone}
                             onChange={e => handleAgentFieldChange('phone', e.target.value)}
                             onBlur={() => {
@@ -1356,6 +1358,7 @@ export default function AdminPropertiesPage() {
                           />
                           <ValidatedInput
                             type="email"
+                            label='email'
                             value={formData.agent?.email}
                             onChange={e => handleAgentFieldChange('email', e.target.value)}
                             onBlur={() => {
