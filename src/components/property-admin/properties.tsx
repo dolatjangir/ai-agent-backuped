@@ -24,9 +24,12 @@ import {
   Save,
   Key,
   TrendingUp,
-  Loader2
+  Loader2,
+  AlertCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import {PropertyFormSchema, PropertyFormData, validateField, validateForm  } from '../../../lib/validation';
+
 
 // Types
 interface Property {
@@ -73,7 +76,7 @@ interface ApiProperty {
   AgentImage: string[];
   PropertyYear: string;
   ListingType?: string;
-  Status?: string;
+  Campaign?: string;
   views?: number;
   createdAt?: string;
 }
@@ -88,17 +91,29 @@ type PropertyStatus = typeof VALID_STATUSES[number];
 // Validation helpers
 const validateType = (type: string): PropertyType => {
   const trimmed = type?.trim();
+    if (!trimmed) return 'House'; 
   return VALID_PROPERTY_TYPES.includes(trimmed as PropertyType) 
     ? (trimmed as PropertyType) 
     : 'House';
 };
 
 const validateStatus = (status: string): PropertyStatus => {
-  return VALID_STATUSES.includes(status as PropertyStatus)
-    ? (status as PropertyStatus)
-    : 'For Sale';
+  if (!status) return 'Draft';  // Add null check
+  
+  const normalized = status.toLowerCase().trim();
+  
+  // Handle various API formats
+  if (normalized === 'for rent' || normalized === 'rent') return 'For Rent';
+  if (normalized === 'for sale' || normalized === 'sale') return 'For Sale';
+  if (normalized === 'sold') return 'Sold';
+  if (normalized === 'draft') return 'Draft';
+  
+  // Fallback to strict check
+  return VALID_STATUSES.includes(status as PropertyStatus) 
+    ? (status as PropertyStatus) 
+    : 'Draft';  // Default to Draft, not For Sale
 };
-
+  
 // Custom Select Component
 interface CustomSelectProps {
   value: string;
@@ -106,9 +121,10 @@ interface CustomSelectProps {
   options: { value: string; label: string }[];
   label: string;
   icon?: React.ReactNode;
+  error?: string;
 }
 
-const CustomSelect: React.FC<CustomSelectProps> = ({ value, onChange, options, label, icon }) => {
+const CustomSelect: React.FC<CustomSelectProps> = ({ value, onChange, options, label, icon, error }) => {
   const [isOpen, setIsOpen] = useState(false);
   const selectRef = useRef<HTMLDivElement>(null);
 
@@ -129,9 +145,11 @@ const CustomSelect: React.FC<CustomSelectProps> = ({ value, onChange, options, l
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         className={`w-full flex items-center justify-between gap-2 px-4 py-3 bg-white border rounded-xl text-sm transition-all duration-200 ${
-          isOpen 
-            ? 'border-[var(--color-primary-500)] ring-2 ring-[var(--color-primary-200)]' 
-            : 'border-gray-200 hover:border-[var(--color-primary-400)]'
+          error 
+            ? 'border-red-300 ring-2 ring-red-100' 
+            : isOpen 
+              ? 'border-[var(--color-primary-500)] ring-2 ring-[var(--color-primary-200)]' 
+              : 'border-gray-200 hover:border-[var(--color-primary-400)]'
         }`}
       >
         <div className="flex items-center gap-2">
@@ -140,6 +158,12 @@ const CustomSelect: React.FC<CustomSelectProps> = ({ value, onChange, options, l
         </div>
         <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
+      {error && (
+        <p className="mt-1.5 text-sm text-red-600 flex items-center gap-1">
+          <AlertCircle className="w-3 h-3" />
+          {error}
+        </p>
+      )}
 
       <AnimatePresence>
         {isOpen && (
@@ -172,6 +196,70 @@ const CustomSelect: React.FC<CustomSelectProps> = ({ value, onChange, options, l
   );
 };
 
+// Input Field Component with Validation
+interface ValidatedInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+  label: string;
+  error?: string;
+  icon?: React.ReactNode;
+}
+
+const ValidatedInput: React.FC<ValidatedInputProps> = ({ label, error, icon, className = '', ...props }) => {
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1.5">{label}</label>
+      <div className="relative">
+        {icon && (
+          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+            {icon}
+          </div>
+        )}
+        <input
+          {...props}
+          className={`w-full ${icon ? 'pl-10' : 'px-4'} pr-4 py-3 border rounded-xl text-sm transition-all focus:outline-none focus:ring-2 ${
+            error 
+              ? 'border-red-300 ring-red-100 focus:ring-red-200' 
+              : 'border-gray-200 focus:border-[var(--color-primary-500)] focus:ring-[var(--color-primary-200)]'
+          } ${className}`}
+        />
+      </div>
+      {error && (
+        <p className="mt-1.5 text-sm text-red-600 flex items-center gap-1">
+          <AlertCircle className="w-3 h-3" />
+          {error}
+        </p>
+      )}
+    </div>
+  );
+};
+
+// Textarea Component with Validation
+interface ValidatedTextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
+  label: string;
+  error?: string;
+}
+
+const ValidatedTextarea: React.FC<ValidatedTextareaProps> = ({ label, error, className = '', ...props }) => {
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1.5">{label}</label>
+      <textarea
+        {...props}
+        className={`w-full px-4 py-3 border rounded-xl text-sm transition-all focus:outline-none focus:ring-2 resize-none ${
+          error 
+            ? 'border-red-300 ring-red-100 focus:ring-red-200' 
+            : 'border-gray-200 focus:border-[var(--color-primary-500)] focus:ring-[var(--color-primary-200)]'
+        } ${className}`}
+      />
+      {error && (
+        <p className="mt-1.5 text-sm text-red-600 flex items-center gap-1">
+          <AlertCircle className="w-3 h-3" />
+          {error}
+        </p>
+      )}
+    </div>
+  );
+};
+
 export default function AdminPropertiesPage() {
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
@@ -184,6 +272,10 @@ export default function AdminPropertiesPage() {
   const [activeTab, setActiveTab] = useState<'all' | 'sale' | 'rent' | 'draft'>('all');
   const [saving, setSaving] = useState(false);
 
+  // Validation errors state
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+
   // Form state
   const [formData, setFormData] = useState<Partial<Property>>({
     title: '',
@@ -193,7 +285,7 @@ export default function AdminPropertiesPage() {
     baths: 1,
     sqft: 0,
     type: 'House',
-    status: 'For Sale',
+    status: 'Draft',
     description: '',
     features: [],
     yearBuilt: new Date().getFullYear(),
@@ -213,41 +305,99 @@ export default function AdminPropertiesPage() {
     return res.json();
   };
 
-const createProperty = async (formData: FormData): Promise<ApiProperty> => {
-  try {
-    const res = await fetch('https://appapi.estateai.in/api/property',{
-      method: 'POST',
+  const createProperty = async (formData: FormData): Promise<ApiProperty> => {
+    try {
+      const res = await fetch('https://appapi.estateai.in/api/property',{
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`HTTP ${res.status}: ${errorText}`);
+      }
+      return res.json();
+    } catch (error) {
+      console.error('Fetch error:', error);
+      throw error;
+    }
+  };
+
+  const updateProperty = async (id: string, formData: FormData): Promise<ApiProperty> => {
+    const res = await fetch(`https://appapi.estateai.in/api/property/${id}`, {
+      method: 'PUT',
       credentials: 'include',
       body: formData,
     });
-    if (!res.ok) {
-      const errorText = await res.text();
-      throw new Error(`HTTP ${res.status}: ${errorText}`);
-    }
+    if (!res.ok) throw new Error('Failed to update property');
     return res.json();
-  } catch (error) {
-    console.error('Fetch error:', error);
-    throw error;
-  }
-};
+  };
 
- const updateProperty = async (id: string, formData: FormData): Promise<ApiProperty> => {
-  const res = await fetch(`https://appapi.estateai.in/api/property/${id}`, {
-    method: 'PUT',
-    credentials: 'include',
-    body: formData,
-  });
-  if (!res.ok) throw new Error('Failed to update property');
-  return res.json();
-};
+  const deletePropertyApi = async (id: string): Promise<void> => {
+    const res = await fetch(`https://appapi.estateai.in/api/property/${id}`, {
+      method: 'DELETE',
+      credentials: 'include'
+    });
+    if (!res.ok) throw new Error('Failed to delete property');
+  };
 
-const deletePropertyApi = async (id: string): Promise<void> => {
-  const res = await fetch(`https://appapi.estateai.in/api/property/${id}`, {
-    method: 'DELETE',
-    credentials: 'include'
-  });
-  if (!res.ok) throw new Error('Failed to delete property');
-};
+  // Validation Functions
+  const validateFormData = (): boolean => {
+    const data: PropertyFormData = {
+      images: formData.images || [],
+      title: formData.title || '',
+      address: formData.address || '',
+      price: formData.price || 0,
+      beds: formData.beds || 0,
+      baths: formData.baths || 0,
+      sqft: formData.sqft || 0,
+      type: (formData.type as any) || 'House',
+      status: (formData.status as any) || 'Draft',
+      description: formData.description || '',
+      yearBuilt: formData.yearBuilt || new Date().getFullYear(),
+      garage: formData.garage || 0,
+      lotSize: formData.lotSize,
+      features: formData.features || [],
+      agent: {
+        name: formData.agent?.name || '',
+        phone: formData.agent?.phone || '',
+        email: formData.agent?.email || '',
+        image: formData.agent?.image
+      }
+    };
+
+    const result = validateForm(data);
+    setErrors(result.errors);
+    return result.success;
+  };
+
+  const validateSingleField = (field: keyof PropertyFormData, value: any) => {
+    const error = validateField(field, value);
+    setErrors(prev => ({
+      ...prev,
+      [field]: error || ''
+    }));
+  };
+
+  const handleFieldChange = (field: keyof PropertyFormData, value: any) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    setTouched(prev => ({ ...prev, [field]: true }));
+    
+    // Real-time validation for touched fields
+    if (touched[field]) {
+      validateSingleField(field, value);
+    }
+  };
+
+  const handleAgentFieldChange = (field: keyof PropertyFormData['agent'], value: string) => {
+    const newAgent = { ...formData.agent!, [field]: value };
+    setFormData(prev => ({ ...prev, agent: newAgent }));
+    setTouched(prev => ({ ...prev, 'agent': true }));
+    
+    if (touched['agent']) {
+      validateSingleField('agent', newAgent);
+    }
+  };
 
   // Data Mapping
   const extractNumber = (features: string[], keyword: string): number => {
@@ -266,6 +416,12 @@ const deletePropertyApi = async (id: string): Promise<void> => {
   };
 
   const mapApiToProperty = (item: ApiProperty): Property | null => {
+    console.log('API Item raw:', {
+    id: item.id,
+    Status: item.Campaign,
+    ListingType: item.ListingType,
+    Verified: item.Verified
+  });
     try {
       const agent = parseJSON(item.AgentInfo, {});
       const features = parseJSON(item.Features, []);
@@ -281,9 +437,18 @@ const deletePropertyApi = async (id: string): Promise<void> => {
       const sqft = parseInt(item.Area) || 0;
       const price = parseInt(item.Price as any) || 0;
       
-      const apiStatus = item.ListingType === 'Rent' || item.Status === 'For Rent' 
-        ? 'For Rent' 
-        : item.Verified === 'Yes' ? 'For Sale' : 'Draft';
+      const getApiStatus = (item: ApiProperty): PropertyStatus => {
+        if (item.Campaign) {
+          return validateStatus(item.Campaign);
+        }
+        if (item.ListingType) {
+          if (item.ListingType.toLowerCase() === 'rent') return 'For Rent';
+          if (item.ListingType.toLowerCase() === 'sale') return 'For Sale';
+        }
+        return item.Verified === 'Yes' ? 'For Sale' : 'Draft';
+      };
+
+      const apiStatus = getApiStatus(item);
 
       return {
         id: String(item.id),
@@ -294,7 +459,7 @@ const deletePropertyApi = async (id: string): Promise<void> => {
         baths: baths,
         sqft: sqft,
         type: validateType(item.PropertySubType),
-        status: validateStatus(apiStatus),
+        status: apiStatus,
         image: images[0] || 'https://via.placeholder.com/800x600',
         images: images,
         description: item.Description?.trim() || 'No description available',
@@ -318,67 +483,61 @@ const deletePropertyApi = async (id: string): Promise<void> => {
     }
   };
 
-const mapPropertyToApiFormData = (data: Partial<Property>, files: File[] = []): FormData => {
-  const formData = new FormData();
-  
-  // Add text fields - match your backend API expected fields
-  formData.append('propertyName', data.title || '');
-  formData.append('Adderess', data.address || '');
-  formData.append('Price', String(data.price || 0));
-  formData.append('Area', String(data.sqft || 0));
-  formData.append('PropertySubType', data.type || 'House');
-  formData.append('Description', data.description || '');
-  formData.append('PropertyYear', String(data.yearBuilt || new Date().getFullYear()));
-  formData.append('Verified', data.status === 'For Sale' ? 'Yes' : 'No');
+  const mapPropertyToApiFormData = (data: Partial<Property>, files: File[] = []): FormData => {
+    const formData = new FormData();
+    
+    // Add text fields - match your backend API expected fields
+    formData.append('propertyName', data.title || '');
+    formData.append('Adderess', data.address || '');
+    formData.append('Price', String(data.price || 0));
+    formData.append('Area', String(data.sqft || 0));
+    formData.append('PropertySubType', data.type || 'House');
+    formData.append('Description', data.description || '');
+    formData.append('PropertyYear', String(data.yearBuilt || new Date().getFullYear()));
+    formData.append('Verified', data.status === 'For Sale' ? 'Yes' : 'No');
 
-  const campaignValue = data.status === 'Draft' ? 'draft' : 
+    const campaignValue = data.status === 'Draft' ? 'draft' : 
                         data.status === 'For Sale' ? 'for sale' : 
-                        data.status === 'For Rent' ? 'for rent' : 'draft';
-  formData.append('Campaign', campaignValue);
-  formData.append('ContactNumber', data.agent?.phone || '+1 (555) 000-0000');
-  
-  // Add features as JSON string
-  const features = data.features || [];
-  if (data.beds && !features.some((f: string) => f.includes('Bedrooms'))) {
-    features.push(`${data.beds} Bedrooms`);
-  }
-  if (data.baths && !features.some((f: string) => f.includes('Bathrooms'))) {
-    features.push(`${data.baths} Bathrooms`);
-  }
-  formData.append('Features', JSON.stringify(features));
-  
-  // Add agent info as JSON string
-  const agentInfo = {
-    name: data.agent?.name || '',
-    phone: data.agent?.phone || '',
-    email: data.agent?.email || '',
-    image: data.agent?.image || ''
+                        data.status === 'For Rent' ? 'for rent' : 
+                        data.status === 'Sold' ? 'sold' : 'draft';
+    formData.append('Campaign', campaignValue);
+    formData.append('ContactNumber', data.agent?.phone || '+1 (555) 000-0000');
+    
+    // Add features as JSON string
+    const features = data.features || [];
+    if (data.beds && !features.some((f: string) => f.includes('Bedrooms'))) {
+      features.push(`${data.beds} Bedrooms`);
+    }
+    if (data.baths && !features.some((f: string) => f.includes('Bathrooms'))) {
+      features.push(`${data.baths} Bathrooms`);
+    }
+    formData.append('Features', JSON.stringify(features));
+    
+    // Add agent info as JSON string
+    const agentInfo = {
+      name: data.agent?.name || '',
+      phone: data.agent?.phone || '',
+      email: data.agent?.email || '',
+      image: data.agent?.image || ''
+    };
+    formData.append('AgentInfo', JSON.stringify(agentInfo));
+    
+    // Handle images - existing URLs vs new file uploads
+    const existingImages = data.images?.filter(img => !img.startsWith('blob:')) || [];
+    
+    // If there are existing images, send them as JSON
+    if (existingImages.length > 0) {
+      formData.append('PropertyImage', JSON.stringify(existingImages));
+    }
+    
+    // If there are new file uploads, send them with the field name backend expects
+    files.forEach((file, index) => {
+      formData.append('PropertyImage', file);
+    });
+    
+    return formData;
   };
-  formData.append('AgentInfo', JSON.stringify(agentInfo));
-  
-  // Handle images - existing URLs vs new file uploads
-  const existingImages = data.images?.filter(img => !img.startsWith('blob:')) || [];
-  
-  // If there are existing images, send them as JSON
-  if (existingImages.length > 0) {
-    formData.append('PropertyImage', JSON.stringify(existingImages));
-  }
-  
-  // If there are new file uploads, send them with the field name backend expects
-  // Try 'PropertyImage' as the field name (same as your API type suggests)
-  files.forEach((file, index) => {
-    // Option 1: If backend expects 'PropertyImage' for files
-    formData.append('PropertyImage', file);
-    
-    // Option 2: If backend expects 'images' (uncomment if Option 1 fails)
-    // formData.append('images', file);
-    
-    // Option 3: If backend expects array notation (uncomment if above fails)
-    // formData.append(`PropertyImage[${index}]`, file);
-  });
-  
-  return formData;
-};
+
   // Load Data
   useEffect(() => {
     loadProperties();
@@ -442,45 +601,58 @@ const mapPropertyToApiFormData = (data: Partial<Property>, files: File[] = []): 
       images: [],
       agent: { name: '', phone: '', email: '', image: '' }
     });
+    setErrors({});
+    setTouched({});
     setIsModalOpen(true);
   };
 
   const openEditModal = (property: Property) => {
     setEditingProperty(property);
     setFormData({ ...property });
+    setErrors({});
+    setTouched({});
     setIsModalOpen(true);
   };
 
-const handleSave = async () => {
-  if (!formData.title || !formData.address) return;
+  const handleSave = async () => {
+    // Mark all fields as touched
+    const allTouched: Record<string, boolean> = {};
+    Object.keys(formData).forEach(key => allTouched[key] = true);
+    allTouched['agent'] = true;
+    setTouched(allTouched);
 
-  try {
-    setSaving(true);
-    
-    // Get files from file input if any
-    const files = fileInputRef.current?.files ? Array.from(fileInputRef.current.files) : [];
-    
-    // Convert to FormData
-    const apiFormData = mapPropertyToApiFormData(formData, files);
-    
-    if (editingProperty) {
-      // Update existing
-      await updateProperty(editingProperty.id, apiFormData);
-    } else {
-      // Add new
-      await createProperty(apiFormData);
+    // Validate entire form
+    if (!validateFormData()) {
+      return; // Stop if validation fails
     }
-    
-    // Reload properties
-    await loadProperties();
-    setIsModalOpen(false);
-  } catch (error) {
-    console.error('Failed to save property:', error);
-    alert('Failed to save property. Please try again.');
-  } finally {
-    setSaving(false);
-  }
-};
+
+    try {
+      setSaving(true);
+      
+      // Get files from file input if any
+      const files = fileInputRef.current?.files ? Array.from(fileInputRef.current.files) : [];
+      
+      // Convert to FormData
+      const apiFormData = mapPropertyToApiFormData(formData, files);
+      
+      if (editingProperty) {
+        // Update existing
+        await updateProperty(editingProperty.id, apiFormData);
+      } else {
+        // Add new
+        await createProperty(apiFormData);
+      }
+      
+      // Reload properties
+      await loadProperties();
+      setIsModalOpen(false);
+    } catch (error) {
+      console.error('Failed to save property:', error);
+      alert('Failed to save property. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const handleDelete = async (id: string) => {
     try {
@@ -495,20 +667,26 @@ const handleSave = async () => {
 
   const addFeature = () => {
     if (featureInput.trim() && !formData.features?.includes(featureInput.trim())) {
-      setFormData(prev => ({ ...prev, features: [...(prev.features || []), featureInput.trim()] }));
+      const newFeatures = [...(formData.features || []), featureInput.trim()];
+      setFormData(prev => ({ ...prev, features: newFeatures }));
       setFeatureInput('');
+      validateSingleField('features', newFeatures);
     }
   };
 
   const removeFeature = (feature: string) => {
-    setFormData(prev => ({ ...prev, features: prev.features?.filter(f => f !== feature) || [] }));
+    const newFeatures = formData.features?.filter(f => f !== feature) || [];
+    setFormData(prev => ({ ...prev, features: newFeatures }));
+    validateSingleField('features', newFeatures);
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files) {
       const newImages = Array.from(files).map(file => URL.createObjectURL(file));
-      setFormData(prev => ({ ...prev, images: [...(prev.images || []), ...newImages] }));
+      const updatedImages = [...(formData.images || []), ...newImages];
+      setFormData(prev => ({ ...prev, images: updatedImages }));
+      validateSingleField('images', updatedImages);
     }
   };
 
@@ -782,7 +960,9 @@ const handleSave = async () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {filteredProperties.map((property) => (
+                {filteredProperties.map((property) => {
+                  
+                  return(
                   <tr key={property.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-4">
@@ -844,8 +1024,8 @@ const handleSave = async () => {
                         </button>
                       </div>
                     </td>
-                  </tr>
-                ))}
+                  </tr>)
+                })}
               </tbody>
             </table>
           </div>
@@ -902,7 +1082,11 @@ const handleSave = async () => {
                           <div key={idx} className="relative w-20 h-20">
                             <img src={img} alt="" className="w-full h-full object-cover rounded-lg" />
                             <button 
-                              onClick={() => setFormData(prev => ({ ...prev, images: prev.images?.filter((_, i) => i !== idx) || [] }))}
+                              onClick={() => {
+                                const newImages = formData.images?.filter((_, i) => i !== idx) || [];
+                                setFormData(prev => ({ ...prev, images: newImages }));
+                                validateSingleField('images', newImages);
+                              }}
                               className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs"
                             >
                               <X className="w-3 h-3" />
@@ -911,7 +1095,11 @@ const handleSave = async () => {
                         ))}
                         <button 
                           onClick={() => fileInputRef.current?.click()}
-                          className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center text-gray-400 hover:border-[var(--color-primary-500)] hover:text-[var(--color-primary-500)] transition-colors"
+                          className={`w-20 h-20 border-2 border-dashed rounded-lg flex flex-col items-center justify-center transition-colors ${
+                            errors.images 
+                              ? 'border-red-300 text-red-400' 
+                              : 'border-gray-300 text-gray-400 hover:border-[var(--color-primary-500)] hover:text-[var(--color-primary-500)]'
+                          }`}
                         >
                           <Upload className="w-6 h-6 mb-1" />
                           <span className="text-xs">Upload</span>
@@ -925,36 +1113,44 @@ const handleSave = async () => {
                           onChange={handleImageUpload}
                         />
                       </div>
+                      {errors.images && (
+                        <p className="text-sm text-red-600 flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3" />
+                          {errors.images}
+                        </p>
+                      )}
                     </div>
 
                     {/* Basic Info */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1.5">Property Title</label>
-                      <input
-                        type="text"
-                        value={formData.title}
-                        onChange={e => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-500)]"
-                        placeholder="e.g., Modern Luxury Villa"
-                      />
-                    </div>
+                    <ValidatedInput
+                      label="Property Title"
+                      value={formData.title}
+                      onChange={e => handleFieldChange('title', e.target.value)}
+                      onBlur={() => {
+                        setTouched(prev => ({ ...prev, title: true }));
+                        validateSingleField('title', formData.title);
+                      }}
+                      error={errors.title}
+                      placeholder="e.g., Modern Luxury Villa"
+                    />
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1.5">Address</label>
-                      <input
-                        type="text"
-                        value={formData.address}
-                        onChange={e => setFormData(prev => ({ ...prev, address: e.target.value }))}
-                        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-500)]"
-                        placeholder="Full address"
-                      />
-                    </div>
+                    <ValidatedInput
+                      label="Address"
+                      value={formData.address}
+                      onChange={e => handleFieldChange('address', e.target.value)}
+                      onBlur={() => {
+                        setTouched(prev => ({ ...prev, address: true }));
+                        validateSingleField('address', formData.address);
+                      }}
+                      error={errors.address}
+                      placeholder="Full address"
+                    />
 
                     <div className="grid grid-cols-2 gap-4">
                       <CustomSelect
                         label="Property Type"
                         value={formData.type || 'House'}
-                        onChange={v => setFormData(prev => ({ ...prev, type: v as any }))}
+                        onChange={v => handleFieldChange('type', v)}
                         options={[
                           { value: 'House', label: 'House' },
                           { value: 'Apartment', label: 'Apartment' },
@@ -963,120 +1159,129 @@ const handleSave = async () => {
                           { value: 'Townhouse', label: 'Townhouse' }
                         ]}
                         icon={<Home className="w-4 h-4" />}
+                        error={errors.type}
                       />
                       <CustomSelect
                         label="Status"
                         value={formData.status || 'Draft'}
-                        onChange={v => setFormData(prev => ({ ...prev, status: v as any }))}
+                        onChange={v => handleFieldChange('status', v)}
                         options={[
                           { value: 'Draft', label: 'Draft' },
                           { value: 'For Sale', label: 'For Sale' },
                           { value: 'For Rent', label: 'For Rent' },
                           { value: 'Sold', label: 'Sold' }
                         ]}
+                        error={errors.status}
                       />
                     </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1.5">Description</label>
-                      <textarea
-                        value={formData.description}
-                        onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                        rows={4}
-                        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-500)] resize-none"
-                        placeholder="Describe the property..."
-                      />
-                    </div>
+                    <ValidatedTextarea
+                      label="Description"
+                      value={formData.description}
+                      onChange={e => handleFieldChange('description', e.target.value)}
+                      onBlur={() => {
+                        setTouched(prev => ({ ...prev, description: true }));
+                        validateSingleField('description', formData.description);
+                      }}
+                      error={errors.description}
+                      rows={4}
+                      placeholder="Describe the property..."
+                    />
                   </div>
 
                   {/* Right Column */}
                   <div className="space-y-6">
                     {/* Price & Details */}
                     <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1.5">Price ($)</label>
-                        <div className="relative">
-                          <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                          <input
-                            type="number"
-                            value={formData.price || ''}
-                            onChange={e => setFormData(prev => ({ ...prev, price: parseInt(e.target.value) || 0 }))}
-                            className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-500)]"
-                            placeholder="0"
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1.5">Square Feet</label>
-                        <div className="relative">
-                          <Square className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                          <input
-                            type="number"
-                            value={formData.sqft || ''}
-                            onChange={e => setFormData(prev => ({ ...prev, sqft: parseInt(e.target.value) || 0 }))}
-                            className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-500)]"
-                            placeholder="0"
-                          />
-                        </div>
-                      </div>
+                      <ValidatedInput
+                        label="Price ($)"
+                        type="number"
+                        value={formData.price || ''}
+                        onChange={e => handleFieldChange('price', parseInt(e.target.value) || 0)}
+                        onBlur={() => {
+                          setTouched(prev => ({ ...prev, price: true }));
+                          validateSingleField('price', formData.price);
+                        }}
+                        error={errors.price}
+                        placeholder="0"
+                        icon={<DollarSign className="w-4 h-4" />}
+                      />
+                      <ValidatedInput
+                        label="Square Feet"
+                        type="number"
+                        value={formData.sqft || ''}
+                        onChange={e => handleFieldChange('sqft', parseInt(e.target.value) || 0)}
+                        onBlur={() => {
+                          setTouched(prev => ({ ...prev, sqft: true }));
+                          validateSingleField('sqft', formData.sqft);
+                        }}
+                        error={errors.sqft}
+                        placeholder="0"
+                        icon={<Square className="w-4 h-4" />}
+                      />
                     </div>
 
                     <div className="grid grid-cols-3 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1.5">Bedrooms</label>
-                        <div className="relative">
-                          <Bed className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                          <input
-                            type="number"
-                            value={formData.beds || ''}
-                            onChange={e => setFormData(prev => ({ ...prev, beds: parseInt(e.target.value) || 0 }))}
-                            className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-500)]"
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1.5">Bathrooms</label>
-                        <div className="relative">
-                          <Bath className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                          <input
-                            type="number"
-                            value={formData.baths || ''}
-                            onChange={e => setFormData(prev => ({ ...prev, baths: parseInt(e.target.value) || 0 }))}
-                            className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-500)]"
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1.5">Garage</label>
-                        <input
-                          type="number"
-                          value={formData.garage || ''}
-                          onChange={e => setFormData(prev => ({ ...prev, garage: parseInt(e.target.value) || 0 }))}
-                          className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-500)]"
-                        />
-                      </div>
+                      <ValidatedInput
+                        label="Bedrooms"
+                        type="number"
+                        value={formData.beds || ''}
+                        onChange={e => handleFieldChange('beds', parseInt(e.target.value) || 0)}
+                        onBlur={() => {
+                          setTouched(prev => ({ ...prev, beds: true }));
+                          validateSingleField('beds', formData.beds);
+                        }}
+                        error={errors.beds}
+                        icon={<Bed className="w-4 h-4" />}
+                      />
+                      <ValidatedInput
+                        label="Bathrooms"
+                        type="number"
+                        value={formData.baths || ''}
+                        onChange={e => handleFieldChange('baths', parseInt(e.target.value) || 0)}
+                        onBlur={() => {
+                          setTouched(prev => ({ ...prev, baths: true }));
+                          validateSingleField('baths', formData.baths);
+                        }}
+                        error={errors.baths}
+                        icon={<Bath className="w-4 h-4" />}
+                      />
+                      <ValidatedInput
+                        label="Garage"
+                        type="number"
+                        value={formData.garage || ''}
+                        onChange={e => handleFieldChange('garage', parseInt(e.target.value) || 0)}
+                        onBlur={() => {
+                          setTouched(prev => ({ ...prev, garage: true }));
+                          validateSingleField('garage', formData.garage);
+                        }}
+                        error={errors.garage}
+                      />
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1.5">Year Built</label>
-                        <input
-                          type="number"
-                          value={formData.yearBuilt || ''}
-                          onChange={e => setFormData(prev => ({ ...prev, yearBuilt: parseInt(e.target.value) || new Date().getFullYear() }))}
-                          className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-500)]"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1.5">Lot Size</label>
-                        <input
-                          type="text"
-                          value={formData.lotSize}
-                          onChange={e => setFormData(prev => ({ ...prev, lotSize: e.target.value }))}
-                          className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-500)]"
-                          placeholder="e.g., 0.5 acres"
-                        />
-                      </div>
+                      <ValidatedInput
+                        label="Year Built"
+                        type="number"
+                        value={formData.yearBuilt || ''}
+                        onChange={e => handleFieldChange('yearBuilt', parseInt(e.target.value) || new Date().getFullYear())}
+                        onBlur={() => {
+                          setTouched(prev => ({ ...prev, yearBuilt: true }));
+                          validateSingleField('yearBuilt', formData.yearBuilt);
+                        }}
+                        error={errors.yearBuilt}
+                      />
+                      <ValidatedInput
+                        label="Lot Size"
+                        value={formData.lotSize}
+                        onChange={e => handleFieldChange('lotSize', e.target.value)}
+                        onBlur={() => {
+                          setTouched(prev => ({ ...prev, lotSize: true }));
+                          validateSingleField('lotSize', formData.lotSize);
+                        }}
+                        error={errors.lotSize}
+                        placeholder="e.g., 0.5 acres"
+                      />
                     </div>
 
                     {/* Features */}
@@ -1088,7 +1293,11 @@ const handleSave = async () => {
                           value={featureInput}
                           onChange={e => setFeatureInput(e.target.value)}
                           onKeyPress={e => e.key === 'Enter' && (e.preventDefault(), addFeature())}
-                          className="flex-1 px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-500)]"
+                          className={`flex-1 px-4 py-2 border rounded-xl focus:outline-none focus:ring-2 ${
+                            errors.features 
+                              ? 'border-red-300 focus:ring-red-200' 
+                              : 'border-gray-200 focus:border-[var(--color-primary-500)] focus:ring-[var(--color-primary-200)]'
+                          }`}
                           placeholder="Add feature (e.g., Pool, Gym)"
                         />
                         <button 
@@ -1098,6 +1307,12 @@ const handleSave = async () => {
                           <Plus className="w-5 h-5" />
                         </button>
                       </div>
+                      {errors.features && (
+                        <p className="mb-2 text-sm text-red-600 flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3" />
+                          {errors.features}
+                        </p>
+                      )}
                       <div className="flex flex-wrap gap-2">
                         {formData.features?.map((feature, idx) => (
                           <span 
@@ -1117,26 +1332,37 @@ const handleSave = async () => {
                     <div className="border-t border-gray-200 pt-6">
                       <h3 className="font-semibold text-gray-900 mb-4">Agent Information</h3>
                       <div className="space-y-4">
-                        <input
-                          type="text"
+                        <ValidatedInput
                           value={formData.agent?.name}
-                          onChange={e => setFormData(prev => ({ ...prev, agent: { ...prev.agent!, name: e.target.value } }))}
-                          className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-500)]"
+                          onChange={e => handleAgentFieldChange('name', e.target.value)}
+                          onBlur={() => {
+                            setTouched(prev => ({ ...prev, 'agent.name': true }));
+                            validateSingleField('agent', formData.agent);
+                          }}
+                          error={errors['agent.name'] || errors['agent']}
                           placeholder="Agent Name"
                         />
                         <div className="grid grid-cols-2 gap-4">
-                          <input
+                          <ValidatedInput
                             type="tel"
                             value={formData.agent?.phone}
-                            onChange={e => setFormData(prev => ({ ...prev, agent: { ...prev.agent!, phone: e.target.value } }))}
-                            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-500)]"
+                            onChange={e => handleAgentFieldChange('phone', e.target.value)}
+                            onBlur={() => {
+                              setTouched(prev => ({ ...prev, 'agent.phone': true }));
+                              validateSingleField('agent', formData.agent);
+                            }}
+                            error={errors['agent.phone']}
                             placeholder="Phone"
                           />
-                          <input
+                          <ValidatedInput
                             type="email"
                             value={formData.agent?.email}
-                            onChange={e => setFormData(prev => ({ ...prev, agent: { ...prev.agent!, email: e.target.value } }))}
-                            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-500)]"
+                            onChange={e => handleAgentFieldChange('email', e.target.value)}
+                            onBlur={() => {
+                              setTouched(prev => ({ ...prev, 'agent.email': true }));
+                              validateSingleField('agent', formData.agent);
+                            }}
+                            error={errors['agent.email']}
                             placeholder="Email"
                           />
                         </div>

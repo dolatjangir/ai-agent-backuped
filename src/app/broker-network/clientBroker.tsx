@@ -313,10 +313,10 @@ useEffect(() => {
         </p>
         
         <div className="flex flex-col sm:flex-row gap-4">
-          <button className="group inline-flex items-center justify-center gap-2 px-8 py-4 bg-[#0066cc] text-white font-semibold rounded-xl hover:bg-[#0057ad] transition-all duration-300 shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40">
+         <Link href="/broker-network/join-the-network"> <button className="group inline-flex items-center justify-center gap-2 px-8 py-4 bg-[#0066cc] text-white font-semibold rounded-xl hover:bg-[#0057ad] transition-all duration-300 shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40">
             Join The Network
             <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-          </button>
+          </button></Link>
           <Link href="/explore-broker-public">
             <button className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-white text-[#0066cc] font-semibold rounded-xl border-2 border-[#0066cc]/20 hover:border-[#0066cc]/40 hover:bg-blue-50/50 transition-all duration-300">
               <Play className="w-5 h-5" />
