@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {PropertyFormSchema, PropertyFormData, validateField, validateForm  } from '../../../lib/validation';
+import ProtectedRoute from '@/utils/ProtectedRoute';
 
 
 // Types
@@ -717,6 +718,7 @@ export default function AdminPropertiesPage() {
   }
 
   return (
+    <ProtectedRoute>
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
@@ -1450,5 +1452,6 @@ export default function AdminPropertiesPage() {
         )}
       </AnimatePresence>
     </div>
+    </ProtectedRoute>
   );
 }

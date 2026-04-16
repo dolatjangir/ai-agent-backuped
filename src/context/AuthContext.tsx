@@ -24,7 +24,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
         const data = await checkAuthAdmin(); // backend verifies token
         if (data.success && data.admin) {
-          console.log("getting admin,",data.admin) 
+          // console.log("getting admin,",data.admin) 
           setAdmin(data.admin);
         } else {
           console.log("check problem : ",data)

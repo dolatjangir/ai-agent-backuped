@@ -1,4 +1,4 @@
-
+// app/dashboard/layout.tsx
 'use client';
 
 import { useRouter, usePathname } from 'next/navigation';
@@ -8,6 +8,7 @@ import { useState } from 'react';
 import ProtectedRoute from '@/utils/ProtectedRoute';
 import { useAuth } from '@/context/AuthContext';
 import Link from 'next/link';
+import MasterProtectedRoute from '@/utils/masterProtectedRoute';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -16,11 +17,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   const navItems = [
-    // { path: '/dashboard', label: 'Dashboard', icon: Layout },
-    // { path: '/dashboard/brokers', label: 'Broker Manager', icon: Users },
+    { path: '/dashboard', label: 'Dashboard', icon: Layout },
+    { path: '/dashboard/brokers', label: 'Broker Manager', icon: Users },
     { path: '/dashboard/properties', label: 'Property Manager', icon: Users },
-    // { path: '/dashboard/requirements', label: 'Requirements', icon: Users },
-    // { path: '/dashboard/broker-request', label: 'Broker Requests', icon: Users },
+    { path: '/dashboard/requirements', label: 'Requirements', icon: Users },
+    { path: '/dashboard/broker-request', label: 'Broker Requests', icon: Users },
   ];
 
   const handleLogout = async () => {
@@ -29,7 +30,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   };
 
   return (
-    <ProtectedRoute>
+    <MasterProtectedRoute>
       <div className="flex h-screen bg-[var(--color-secondary-50)] overflow-hidden">
         
         {/* Desktop Sidebar - Sticky */}
@@ -174,6 +175,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         </main>
       </div>
-    </ProtectedRoute>
+    </MasterProtectedRoute>
   );
 }

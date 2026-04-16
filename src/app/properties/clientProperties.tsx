@@ -45,8 +45,8 @@ interface Property {
   beds: number;
   baths: number;
   sqft: number;
-  type: 'House' | 'Apartment' | 'Condo' | 'Villa' | 'Townhouse';
-  status: 'For Sale' | 'For Rent';
+  type: string;
+  status: string;
   image: string;
   images: string[];
   description: string;
@@ -87,7 +87,6 @@ interface ApiProperty {
 // CONSTANTS
 // ==========================================
 
-const VALID_PROPERTY_TYPES: Property['type'][] = ['House', 'Apartment', 'Condo', 'Villa', 'Townhouse'];
 const API_ENDPOINT = 'https://appapi.estateai.in/api/property';
 const PLACEHOLDER_IMAGE = 'https://via.placeholder.com/800x600?text=No+Image';
 
@@ -125,6 +124,23 @@ const extractNumberFromFeatures = (features: unknown[], keyword: string): number
 
 
 
+// Add this helper function
+const getStatusColor = (status: string): string => {
+  const normalized = status.toLowerCase().trim();
+  
+  switch (normalized) {
+    case 'for rent':
+      return 'bg-blue-500 border border-blue-700';
+    case 'for sale':
+      return 'bg-green-500 border border-green-700';
+    case 'sold':
+      return 'bg-orange-500 border border-orange-700';
+    case 'draft':
+      return 'bg-stone-500 border border-stone-700';
+    default:
+      return 'bg-[var(--color-primary-600)]';
+  }
+};
 
 const mapApiToProperty = (item: unknown): Property | null => {
   // Type guard to ensure item is an object
@@ -164,33 +180,12 @@ const mapApiToProperty = (item: unknown): Property | null => {
     const baths = extractNumberFromFeatures(features, 'bathroom');
     
     // Map and validate property type
-    const rawType = apiItem.PropertySubType?.trim() || 'House';
-    const mappedType = VALID_PROPERTY_TYPES.includes(rawType as Property['type']) 
-      ? rawType as Property['type'] 
-      : 'House';
-
+   const type = apiItem.PropertySubType?.trim() || 'House';
     // ==========================================
     // FIXED: Use Campaign field for status with proper mapping
     // ==========================================
-    const getStatusFromCampaign = (campaign: string | undefined): Property['status'] => {
-      if (!campaign) return 'For Sale'; // Default fallback
-      
-      const normalized = campaign.toLowerCase().trim();
-      
-      // Map Campaign values to Property status
-      if (normalized === 'for rent' || normalized === 'rent') return 'For Rent';
-      if (normalized === 'for sale' || normalized === 'sale') return 'For Sale';
-      if (normalized === 'sold') return 'For Sale'; // Sold items still show as For Sale but can be filtered
-      if (normalized === 'draft') return 'For Sale'; // Drafts default to For Sale in customer view
-      
-      // Fallback to ListingType if Campaign doesn't match
-      const listingType = apiItem.ListingType?.toLowerCase();
-      if (listingType === 'rent') return 'For Rent';
-      
-      return 'For Sale';
-    };
-
-    const status: Property['status'] = getStatusFromCampaign(apiItem.Campaign);
+  
+    const status = apiItem.Campaign || 'For Sale';
 
     // Build property object
     const property: Property = {
@@ -201,7 +196,7 @@ const mapApiToProperty = (item: unknown): Property | null => {
       beds: Number.isFinite(beds) ? beds : 0,
       baths: Number.isFinite(baths) ? baths : 0,
       sqft: Number.isFinite(sqft) ? sqft : 0,
-      type: mappedType,
+      type: type,
       status: status,
       image: images[0],
       images: images,
@@ -465,20 +460,21 @@ export default function PropertiesPage(): React.ReactElement {
   // FILTER OPTIONS
   // ==========================================
 
-  const typeOptions = useMemo(() => [
+ const typeOptions = useMemo(() => {
+  const uniqueTypes = [...new Set(properties.map(p => p.type))];
+  return [
     { value: 'All', label: 'All Types' },
-    { value: 'House', label: 'House' },
-    { value: 'Apartment', label: 'Apartment' },
-    { value: 'Condo', label: 'Condo' },
-    { value: 'Villa', label: 'Villa' },
-    { value: 'Townhouse', label: 'Townhouse' }
-  ], []);
+    ...uniqueTypes.map(t => ({ value: t, label: t }))
+  ];
+}, [properties]);
 
-  const statusOptions = useMemo(() => [
+const statusOptions = useMemo(() => {
+  const uniqueStatuses = [...new Set(properties.map(p => p.status))];
+  return [
     { value: 'All', label: 'All Status' },
-    { value: 'For Sale', label: 'For Sale' },
-    { value: 'For Rent', label: 'For Rent' }
-  ], []);
+    ...uniqueStatuses.map(s => ({ value: s, label: s }))
+  ];
+}, [properties]);
 
   const priceOptions = useMemo(() => [
     { value: 'All', label: 'Any Price' },
@@ -834,13 +830,9 @@ export default function PropertiesPage(): React.ReactElement {
                     }}
                   />
                   <div className="absolute top-4 left-4">
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                      property.status === 'For Sale' 
-                        ? 'bg-[var(--color-primary-600)] text-white' 
-                        : 'bg-[var(--color-secondary-500)] text-white'
-                    }`}>
-                      {property.status}
-                    </span>
+                    <span className={`px-3 py-1 rounded-full text-xs font-semibold text-white ${getStatusColor(property.status)}`}>
+  {property.status}
+</span>
                   </div>
                   <button 
                     type="button"
@@ -980,13 +972,9 @@ export default function PropertiesPage(): React.ReactElement {
 
                   {/* Status Badge */}
                   <div className="absolute top-4 left-4">
-                    <span className={`px-4 py-1.5 rounded-full text-sm font-semibold ${
-                      selectedProperty.status === 'For Sale' 
-                        ? 'bg-[var(--color-primary-600)] text-white' 
-                        : 'bg-[var(--color-secondary-500)] text-white'
-                    }`}>
-                      {selectedProperty.status}
-                    </span>
+                    <span className={`px-3 py-1 rounded-full text-xs font-semibold text-white ${getStatusColor(selectedProperty.status)}`}>
+ {selectedProperty.status}
+</span>
                   </div>
 
                   {/* Image Counter */}
