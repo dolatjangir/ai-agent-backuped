@@ -16,9 +16,11 @@ import {
   Loader2,
   Filter,
   ChevronDown,
-  MessageCircle
+  MessageCircle,
+  Home
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import BrokerPropertiesModal from '@/components/popups/brokerproperty';
 
 // Types
 interface Broker {
@@ -294,10 +296,12 @@ const BrokerDetailModal = ({
 // Broker Card Component (Public View - No Admin Controls)
 const BrokerCard = ({ 
   broker, 
-  onView 
+  onView,
+  onViewProperties
 }: { 
   broker: Broker; 
   onView: (broker: Broker) => void;
+  onViewProperties: (broker: Broker) => void;
 }) => {
   const specializationArray = Array.isArray(broker.specialization) 
     ? broker.specialization 
@@ -338,12 +342,30 @@ const BrokerCard = ({
         )}
         
         {/* Hover Overlay with CTA */}
-        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-          <span className="px-6 py-3 bg-white text-[var(--color-primary-600)] rounded-full font-semibold shadow-lg flex items-center gap-2 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
-            View Profile
-            <ArrowRight className="w-4 h-4" />
-          </span>
-        </div>
+       <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-black/40 backdrop-blur-sm">
+  <div className="flex flex-col gap-3 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        onView(broker);
+      }}
+      className="px-6 py-3 bg-white text-[var(--color-primary-600)] rounded-full font-semibold shadow-lg flex items-center gap-2 hover:bg-gray-50 transition-colors"
+    >
+      View Profile
+      <ArrowRight className="w-4 h-4" />
+    </button>
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        onViewProperties(broker);
+      }}
+      className="px-6 py-3 bg-[var(--color-primary-600)] text-white rounded-full font-semibold shadow-lg flex items-center gap-2 hover:bg-[var(--color-primary-700)] transition-colors"
+    >
+      <Home className="w-4 h-4" />
+      View Properties
+    </button>
+  </div>
+</div>
       </div>
       
       {/* Content */}
@@ -465,7 +487,8 @@ export default function ExploreBrokersPage() {
   const [selectedBroker, setSelectedBroker] = useState<Broker | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-  
+  const [selectedPropertiesBroker, setSelectedPropertiesBroker] = useState<Broker | null>(null);
+const [isPropertiesModalOpen, setIsPropertiesModalOpen] = useState(false);
   // Filter states
   const [locationFilter, setLocationFilter] = useState('');
   const [specializationFilter, setSpecializationFilter] = useState('');
@@ -505,6 +528,11 @@ export default function ExploreBrokersPage() {
     setSelectedBroker(broker);
     setIsDetailModalOpen(true);
   };
+
+  const openPropertiesModal = (broker: Broker) => {
+  setSelectedPropertiesBroker(broker);
+  setIsPropertiesModalOpen(true);
+};
 
   // Extract unique locations and specializations for filters
   const locations = [...new Set(brokers.map(b => b.location))].filter(Boolean);
@@ -676,9 +704,10 @@ export default function ExploreBrokersPage() {
                   transition={{ delay: index * 0.05 }}
                 >
                   <BrokerCard
-                    broker={broker}
-                    onView={openDetailModal}
-                  />
+  broker={broker}
+  onView={openDetailModal}
+  onViewProperties={openPropertiesModal}
+/>
                 </motion.div>
               ))}
             </AnimatePresence>
@@ -708,6 +737,13 @@ export default function ExploreBrokersPage() {
         isOpen={isDetailModalOpen}
         onClose={() => setIsDetailModalOpen(false)}
       />
+      {/* Properties Modal */}
+<BrokerPropertiesModal
+  brokerId={selectedPropertiesBroker?.id || ''}
+  brokerName={selectedPropertiesBroker?.name || ''}
+  isOpen={isPropertiesModalOpen}
+  onClose={() => setIsPropertiesModalOpen(false)}
+/>
     </div>
   );
 }

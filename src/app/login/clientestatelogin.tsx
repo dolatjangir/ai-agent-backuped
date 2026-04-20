@@ -26,12 +26,14 @@ const LoginEstate = () => {
 
   // Redirect if already logged in
   useEffect(() => {
-    const date = new Date();
-    setCurrentYear(date.getFullYear());
-    if (admin) {
+  if (admin) {
+    if (admin.role === "administrator") {
+      router.push("/admin-dashboard");
+    } else {
       router.push("/dashboard");
     }
-  }, [admin]);
+  }
+}, [admin]);
 
   if (isLoading || loading) {
     return (

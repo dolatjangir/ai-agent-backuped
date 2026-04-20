@@ -17,11 +17,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   const navItems = [
-    { path: '/dashboard', label: 'Dashboard', icon: Layout },
-    { path: '/dashboard/brokers', label: 'Broker Manager', icon: Users },
-    { path: '/dashboard/properties', label: 'Property Manager', icon: Users },
-    { path: '/dashboard/requirements', label: 'Requirements', icon: Users },
-    { path: '/dashboard/broker-request', label: 'Broker Requests', icon: Users },
+    { path: '/admin-dashboard', label: 'Dashboard', icon: Layout },
+    { path: '/admin-dashboard/brokers', label: 'Broker Manager', icon: Users },
+    { path: '/admin-dashboard/properties', label: 'Property Manager', icon: Users },
+    { path: '/admin-dashboard/requirements', label: 'Requirements', icon: Users },
+    { path: '/admin-dashboard/broker-request', label: 'Broker Requests', icon: Users },
   ];
 
   const handleLogout = async () => {
