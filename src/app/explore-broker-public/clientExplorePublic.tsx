@@ -29,7 +29,7 @@ interface Broker {
   image: string | null;
   company: string;
   role: string;
-  location: string;
+  city: string;
   description: string;
   email: string;
   phone: string;
@@ -39,6 +39,7 @@ interface Broker {
   dealsClosed?: number;
   createdAt: string;
   updatedAt: string;
+  properties?: any[];
 }
 
 // Toast Notification Component
@@ -122,7 +123,7 @@ const BrokerDetailModal = ({
             {/* Header Image Section */}
             <div className="relative h-64 md:h-80 shrink-0">
               <img 
-                src={broker.image || 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=800&h=400&fit=crop'} 
+                src={broker.image || 'https://static.vecteezy.com/system/resources/thumbnails/009/292/244/small/default-avatar-icon-of-social-media-user-vector.jpg'} 
                 alt={broker.name}
                 className="w-full h-full object-cover"
               />
@@ -253,7 +254,7 @@ const BrokerDetailModal = ({
                         <MapPin className="w-5 h-5 text-[var(--color-primary-600)]" />
                         <span className="text-sm font-medium">Location</span>
                       </div>
-                      <p className="text-gray-900 font-medium pl-8">{broker.location}</p>
+                      <p className="text-gray-900 font-medium pl-8">{broker.city}</p>
                     </div>
                     
                     {/* Company */}
@@ -320,7 +321,7 @@ const BrokerCard = ({
       {/* Image Container */}
       <div className="relative h-56 overflow-hidden">
         <img 
-          src={broker.image || 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=400&h=300&fit=crop'} 
+          src={broker.image || 'https://static.vecteezy.com/system/resources/thumbnails/009/292/244/small/default-avatar-icon-of-social-media-user-vector.jpg'} 
           alt={broker.name}
           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
         />
@@ -388,7 +389,7 @@ const BrokerCard = ({
         
         <div className="flex items-center gap-2 text-gray-500 text-sm mb-4">
           <MapPin className="w-4 h-4" />
-          <span className="truncate">{broker.location}</span>
+          <span className="truncate">{broker.city}</span>
         </div>
         
         <p className="text-gray-600 text-sm line-clamp-2 mb-4 leading-relaxed">
@@ -494,27 +495,49 @@ const [isPropertiesModalOpen, setIsPropertiesModalOpen] = useState(false);
   const [specializationFilter, setSpecializationFilter] = useState('');
 
   // Fetch brokers
-  const fetchBrokers = useCallback(async () => {
-    try {
-      setLoading(true);
-      const response = await fetch('/api/brokers');
-      if (!response.ok) throw new Error('Failed to fetch brokers');
-      const data = await response.json();
-      
-      // Add mock ratings for demo (remove in production)
-      const enhancedData = data.map((broker: Broker, index: number) => ({
-        ...broker,
-        rating: (4.5 + Math.random() * 0.5).toFixed(1),
-        dealsClosed: Math.floor(50 + Math.random() * 200)
-      }));
-      
-      setBrokers(enhancedData);
-    } catch (error) {
-      showToast('Failed to load brokers', 'error');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+const fetchBrokers = useCallback(async () => {
+  try {
+    setLoading(true);
+    const response = await fetch('https://appapi.estateai.in/api/admin/all',{credentials:"include"});
+    if (!response.ok) throw new Error('Failed to fetch brokers');
+    
+    const result = await response.json();
+    const admins = result.admins || []; // API returns { success, count, admins }
+    
+    // Map API response (Admin model) to Broker interface
+    const mappedBrokers = admins.map((admin: any) => ({
+      id: admin._id || admin.id, // API uses _id
+      name: admin.name,
+      image: admin.AdminImage ? JSON.parse(admin.AdminImage)[0] : '', // No image field in API, keep null for placeholder
+      company: admin.company || 'Independent',
+      role: admin.role === 'client_admin' ? 'Real Estate Broker' : admin.role,
+      location: admin.city || admin.AddressLine1 || 'Not specified',
+      description: admin.company 
+        ? `Experienced real estate professional at ${admin.company}${admin.city ? `, based in ${admin.city}` : ''}.`
+        : 'Experienced real estate professional ready to help you find your perfect property.',
+      email: admin.email,
+      phone: admin.phone || '',
+      experience: admin.experience || '5+ years',
+      specialization: admin.specialization 
+        ? (typeof admin.specialization === 'string' 
+            ? admin.specialization.split(',').map((s: string) => s.trim()).filter(Boolean)
+            : admin.specialization)
+        : ['Residential', 'Commercial'], // Default fallback
+      rating: (4.5 + Math.random() * 0.5).toFixed(1),
+      dealsClosed: Math.floor(50 + Math.random() * 200),
+      createdAt: admin.createdAt,
+      updatedAt: admin.updatedAt,
+      // Store properties for the modal
+      properties: admin.createdPropertys || []
+    }));
+    
+    setBrokers(mappedBrokers);
+  } catch (error) {
+    showToast('Failed to load brokers', 'error');
+  } finally {
+    setLoading(false);
+  }
+}, []);
 
   useEffect(() => {
     fetchBrokers();
@@ -529,13 +552,13 @@ const [isPropertiesModalOpen, setIsPropertiesModalOpen] = useState(false);
     setIsDetailModalOpen(true);
   };
 
-  const openPropertiesModal = (broker: Broker) => {
+const openPropertiesModal = (broker: Broker) => {
   setSelectedPropertiesBroker(broker);
   setIsPropertiesModalOpen(true);
 };
 
   // Extract unique locations and specializations for filters
-  const locations = [...new Set(brokers.map(b => b.location))].filter(Boolean);
+  const locations = [...new Set(brokers.map(b => b.city))].filter(Boolean);
   const allSpecializations = brokers.flatMap(b => 
     Array.isArray(b.specialization) ? b.specialization : JSON.parse(b.specialization || '[]')
   );
@@ -548,7 +571,7 @@ const [isPropertiesModalOpen, setIsPropertiesModalOpen] = useState(false);
       broker.company.toLowerCase().includes(searchQuery.toLowerCase()) ||
       broker.role.toLowerCase().includes(searchQuery.toLowerCase());
     
-    const matchesLocation = !locationFilter || broker.location === locationFilter;
+    const matchesLocation = !locationFilter || broker.city === locationFilter;
     
     const brokerSpecs = Array.isArray(broker.specialization) 
       ? broker.specialization 
@@ -741,6 +764,7 @@ const [isPropertiesModalOpen, setIsPropertiesModalOpen] = useState(false);
 <BrokerPropertiesModal
   brokerId={selectedPropertiesBroker?.id || ''}
   brokerName={selectedPropertiesBroker?.name || ''}
+  properties={selectedPropertiesBroker?.properties || []}
   isOpen={isPropertiesModalOpen}
   onClose={() => setIsPropertiesModalOpen(false)}
 />

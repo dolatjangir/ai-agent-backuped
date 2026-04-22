@@ -290,51 +290,98 @@ const [loading, setLoading] = useState(true);
 
   useEffect(() => {
   loadApplications();
-}, [statusFilter, searchQuery, currentPage]);
+}, []);
 const loadApplications = async () => {
   try {
     setLoading(true);
-    const data = await fetchApplications({
-      status: statusFilter === 'all' ? undefined : statusFilter,
-      search: searchQuery || undefined,
-      page: currentPage,
-      limit: itemsPerPage
+    const response = await fetch('https://appapi.estateai.in/api/user/newusers', {
+      credentials: 'include'
     });
-    setApplications(data.applications);
-    // Update pagination from API response
+    if (!response.ok) throw new Error('Failed to fetch');
+    const result = await response.json();
+    
+    // Map API data to your BrokerApplication interface
+    const mappedApps = (result.data || []).map((user: any) => ({
+      id: user.id,
+      fullName: user.name,
+      email: user.email,
+      phone: user.phone || '',
+      companyName: user.company || '',
+      role: user.role || 'N/A',
+      experience: user.experience || '',
+      dealsClosed: '', // API doesn't have this
+      location: user.city || '',
+      specializations: user.specialization 
+        ? (typeof user.specialization === 'string' 
+            ? JSON.parse(user.specialization) 
+            : user.specialization)
+        : [],
+      description: '', // API doesn't have this
+      profileImage: user.image 
+        ? (typeof user.image === 'string' 
+            ? JSON.parse(user.image)[0] 
+            : user.image)
+        : null,
+      status: 'pending', // API doesn't have status - default to pending or filter by role
+      submittedAt: new Date().toISOString() // API doesn't have this
+    }));
+    
+    setApplications(mappedApps);
   } catch (error) {
     console.error('Error loading applications:', error);
+    setApplications([]); // Don't leave stale data
   } finally {
     setLoading(false);
   }
 };
-useEffect(() => {
-  loadStats();
-}, []);
+// useEffect(() => {
+//   loadStats();
+// }, []);
 
-const loadStats = async () => {
-  try {
-    const data = await fetchStats();
-    // Use API stats instead of computed stats
-  } catch (error) {
-    console.error('Error loading stats:', error);
-  }
-};
+// const loadStats = async () => {
+//   try {
+//     const data = await fetchStats();
+//     // Use API stats instead of computed stats
+//   } catch (error) {
+//     console.error('Error loading stats:', error);
+//   }
+// };
 const handleApprove = async (id: string) => {
   try {
-    await updateApplicationStatus(id, 'approved');
-    // Refresh data
-    loadApplications();
-    loadStats();
-    if (selectedApplication?.id === id) {
-      // Update modal data
+    const response = await fetch(`https://appapi.estateai.in/api/user/newusers/${id}`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        status: 'approved',
+        role: 'client_admin' // if you want to assign role on approve
+      })
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Failed to approve application');
     }
-  } catch (error) {
+    
+    // Update local state
+    setApplications(prev => prev.map(app => 
+      app.id === id ? { ...app, status: 'approved' as const } : app
+    ));
+    
+    if (selectedApplication?.id === id) {
+      setSelectedApplication(prev => prev ? { ...prev, status: 'approved' as const } : null);
+    }
+    
+    // Close modal if open
+    setIsModalOpen(false);
+    
+  } catch (error: any) {
     console.error('Error approving:', error);
-    alert('Failed to approve application');
+    alert(error.message || 'Failed to approve application');
   }
 };
-
 // Handle reject with API
 const handleReject = async (id: string) => {
   if (!rejectionReason.trim()) {
@@ -343,50 +390,43 @@ const handleReject = async (id: string) => {
   }
   
   try {
-    await updateApplicationStatus(id, 'rejected', rejectionReason);
-    loadApplications();
-    loadStats();
+    const response = await fetch(`https://appapi.estateai.in/api/user/newusers/${id}`, {
+      method: 'DELETE', 
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        status: 'rejected',
+        rejectionReason: rejectionReason
+      })
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Failed to reject application');
+    }
+    
+    // If DELETE removes user, filter out from list
+    setApplications(prev => prev.filter(app => app.id !== id));
+    
+    // If PUT updates status instead, use this:
+    // setApplications(prev => prev.map(app => 
+    //   app.id === id ? { ...app, status: 'rejected' as const, rejectionReason } : app
+    // ));
+    
+    // Reset states
     setRejectionReason('');
     setShowRejectionInput(false);
-  } catch (error) {
+    setIsModalOpen(false);
+    setSelectedApplication(null);
+    
+  } catch (error: any) {
     console.error('Error rejecting:', error);
-    alert('Failed to reject application');
+    alert(error.message || 'Failed to reject application');
   }
 };
-  // const handleApprove = (id: string) => {
-  //   setApplications(prev => prev.map(app => 
-  //     app.id === id 
-  //       ? { ...app, status: 'approved', reviewedAt: new Date().toISOString(), reviewedBy: 'Admin User' }
-  //       : app
-  //   ));
-  //   if (selectedApplication?.id === id) {
-  //     setSelectedApplication(prev => prev ? { ...prev, status: 'approved', reviewedAt: new Date().toISOString(), reviewedBy: 'Admin User' } : null);
-  //   }
-  // };
-
-  // const handleReject = (id: string) => {
-  //   if (!rejectionReason.trim()) {
-  //     setShowRejectionInput(true);
-  //     return;
-  //   }
-    
-  //   setApplications(prev => prev.map(app => 
-  //     app.id === id 
-  //       ? { ...app, status: 'rejected', reviewedAt: new Date().toISOString(), reviewedBy: 'Admin User', rejectionReason }
-  //       : app
-  //   ));
-  //   if (selectedApplication?.id === id) {
-  //     setSelectedApplication(prev => prev ? { 
-  //       ...prev, 
-  //       status: 'rejected', 
-  //       reviewedAt: new Date().toISOString(), 
-  //       reviewedBy: 'Admin User',
-  //       rejectionReason 
-  //     } : null);
-  //   }
-  //   setRejectionReason('');
-  //   setShowRejectionInput(false);
-  // };
+ 
 
   const openApplicationDetails = (app: BrokerApplication) => {
     setSelectedApplication(app);

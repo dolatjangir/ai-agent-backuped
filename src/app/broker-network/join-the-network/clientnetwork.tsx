@@ -148,17 +148,17 @@ const TagSelect: React.FC<TagSelectProps> = ({ label, tags, selected, onChange }
 
 export default function JoinNetworkPage() {
   const [formData, setFormData] = useState({
-    fullName: '',
+    name: '',
     email: '',
     phone: '',
-    companyName: '',
+    company: '',
     role: '',
     experience: '',
-    dealsClosed: '',
-    location: '',
-    specializations: [] as string[],
+   password:'',
+    city: '',
+    specialization: [] as string[],
     description: '',
-    profileImage: null as string | null
+    AdminImage: null as string | null
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -189,7 +189,7 @@ const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
 
     const reader = new FileReader();
     reader.onloadend = () => {
-      setFormData(prev => ({ ...prev, profileImage: reader.result as string }));
+      setFormData(prev => ({ ...prev, AdminImage: reader.result as string }));
     };
     reader.readAsDataURL(file);
   }
@@ -200,27 +200,45 @@ const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
 
 // Add onBlur handler to email input
 const checkEmailExists = async (email: string) => {
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return;
+  
   try {
-    const response = await fetch(`/api/broker-applications?search=${encodeURIComponent(email)}`);
-    const data = await response.json();
-    const exists = data.applications?.some((app: any) => 
-      app.email.toLowerCase() === email.toLowerCase()
+    // Option 1: If your backend has a dedicated check endpoint
+    // const response = await fetch(
+    //   `https://appapi.estateai.in/api/user/check-email?email=${encodeURIComponent(email)}`,
+    //   { credentials: 'include' }
+    // );
+    
+    // Option 2: If you must check against existing admins list
+    const response = await fetch(
+      `https://appapi.estateai.in/api/admin/all`,
+      { credentials: 'include' }
     );
+    
+    if (!response.ok) throw new Error('Failed to check email');
+    
+    const data = await response.json();
+    
+    // Adjust based on your actual API response structure
+    const exists = data.exists || data.data?.some((user: any) => 
+      user.email?.toLowerCase() === email.toLowerCase()
+    );
+    
     if (exists) {
-      setEmailError('An application with this email already exists');
+      setEmailError('This email is already registered');
     } else {
       setEmailError('');
     }
   } catch (error) {
     console.error('Error checking email:', error);
+    setEmailError(''); // Don't block user on check failure
   }
 };
-
 const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
   
   // Validation
-  if (!formData.fullName || !formData.email || !formData.phone || !formData.companyName || !formData.role || !formData.experience || !formData.location || !formData.description) {
+  if (!formData.name || !formData.email || !formData.phone || !formData.company || !formData.role || !formData.experience || !formData.city ) {
     alert('Please fill in all required fields');
     return;
   }
@@ -230,31 +248,32 @@ const handleSubmit = async (e: React.FormEvent) => {
   try {
     // Create FormData object for multipart/form-data (supports file upload)
     const submitData = new FormData();
-    submitData.append('fullName', formData.fullName);
+    submitData.append('name', formData.name);
     submitData.append('email', formData.email);
     submitData.append('phone', formData.phone);
-    submitData.append('companyName', formData.companyName);
+    submitData.append('company', formData.company);
     submitData.append('role', formData.role);
     submitData.append('experience', formData.experience);
-    submitData.append('dealsClosed', formData.dealsClosed);
-    submitData.append('location', formData.location);
-    submitData.append('specializations', JSON.stringify(formData.specializations));
-    submitData.append('description', formData.description);
+    // submitData.append('dealsClosed', formData.dealsClosed);
+    submitData.append('city', formData.city);
+    submitData.append('specialization', JSON.stringify(formData.specialization));
+    submitData.append('password', formData.password);
 
     // Handle profile image - convert base64 to file if exists
-    if (formData.profileImage) {
+    if (formData.AdminImage) {
       // If it's a base64 string from FileReader, convert to blob
-      const response = await fetch(formData.profileImage);
+      const response = await fetch(formData.AdminImage);
       const blob = await response.blob();
       const file = new File([blob], 'profile.jpg', { type: 'image/jpeg' });
-      submitData.append('profileImage', file);
+      submitData.append('AdminImage', file);
     }
 
     // Submit to API
-    const response = await fetch('/api/broker-applications', {
-      method: 'POST',
-      body: submitData,
-    });
+    const response = await fetch('https://appapi.estateai.in/api/user/newusersignup', {
+  method: 'POST',
+  credentials: 'include',  // add this
+  body: submitData,
+});
 
     const result = await response.json();
 
@@ -492,13 +511,13 @@ if (isSuccess) {
                     <div 
                       onClick={() => fileInputRef.current?.click()}
                       className={`w-32 h-32 rounded-full flex items-center justify-center cursor-pointer transition-all overflow-hidden border-4 ${
-                        formData.profileImage 
+                        formData.AdminImage
                           ? 'border-[var(--color-primary-300)]' 
                           : 'border-gray-200 hover:border-[var(--color-primary-400)] bg-gray-50'
                       }`}
                     >
-                      {formData.profileImage ? (
-                        <img src={formData.profileImage} alt="Profile" className="w-full h-full object-cover" />
+                      {formData.AdminImage ? (
+                        <img src={formData.AdminImage} alt="Profile" className="w-full h-full object-cover" />
                       ) : (
                         <div className="text-center">
                           <Upload className="w-8 h-8 text-gray-400 mx-auto mb-1" />
@@ -506,10 +525,10 @@ if (isSuccess) {
                         </div>
                       )}
                     </div>
-                    {formData.profileImage && (
+                    {formData.AdminImage && (
                       <button
                         type="button"
-                        onClick={() => setFormData(prev => ({ ...prev, profileImage: null }))}
+                        onClick={() => setFormData(prev => ({ ...prev, AdminImage: null }))}
                         className="absolute -top-1 -right-1 w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors"
                       >
                         <X className="w-4 h-4" />
@@ -534,8 +553,8 @@ if (isSuccess) {
                       <input
                         required
                         type="text"
-                        value={formData.fullName}
-                        onChange={e => setFormData(prev => ({ ...prev, fullName: e.target.value }))}
+                        value={formData.name}
+                        onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
                         className="w-full pl-12 pr-4 py-3.5 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-500)] focus:border-transparent transition-all"
                         placeholder="John Doe"
                       />
@@ -583,6 +602,20 @@ if (isSuccess) {
                       />
                     </div>
                   </div>
+                    <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Create Password</label>
+                    <div className="relative">
+                      <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                      <input
+                        required
+                        type="password"
+                        value={formData.password}
+                        onChange={e => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                        className="w-full pl-12 pr-4 py-3.5 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-500)] focus:border-transparent transition-all"
+                        placeholder="create a strong password"
+                      />
+                    </div>
+                  </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Company Name *</label>
@@ -591,8 +624,8 @@ if (isSuccess) {
                       <input
                         required
                         type="text"
-                        value={formData.companyName}
-                        onChange={e => setFormData(prev => ({ ...prev, companyName: e.target.value }))}
+                        value={formData.company}
+                        onChange={e => setFormData(prev => ({ ...prev, company: e.target.value }))}
                         className="w-full pl-12 pr-4 py-3.5 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-500)] focus:border-transparent transition-all"
                         placeholder="Your Brokerage"
                       />
@@ -607,7 +640,7 @@ if (isSuccess) {
                     value={formData.role}
                     onChange={v => setFormData(prev => ({ ...prev, role: v }))}
                     options={[
-                      { value: 'Broker', label: 'Real Estate Broker' },
+                      { value: 'client_admin', label: 'Real Estate Broker' },
                       { value: 'Agent', label: 'Real Estate Agent' },
                       { value: 'Team Lead', label: 'Team Lead' },
                       { value: 'Broker Owner', label: 'Broker Owner' }
@@ -630,7 +663,7 @@ if (isSuccess) {
                     icon={<Award className="w-5 h-5" />}
                   />
 
-                  <div>
+                  {/* <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Deals Closed (Optional)</label>
                     <input
                       type="number"
@@ -639,7 +672,7 @@ if (isSuccess) {
                       className="w-full px-4 py-3.5 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-500)] focus:border-transparent transition-all"
                       placeholder="e.g., 50"
                     />
-                  </div>
+                  </div> */}
                 </div>
 
                 {/* Location & Specializations */}
@@ -651,8 +684,8 @@ if (isSuccess) {
                       <input
                         required
                         type="text"
-                        value={formData.location}
-                        onChange={e => setFormData(prev => ({ ...prev, location: e.target.value }))}
+                        value={formData.city}
+                        onChange={e => setFormData(prev => ({ ...prev, city: e.target.value }))}
                         className="w-full pl-12 pr-4 py-3.5 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-500)] focus:border-transparent transition-all"
                         placeholder="e.g., Los Angeles, CA"
                       />
@@ -662,13 +695,13 @@ if (isSuccess) {
                   <TagSelect
                     label="Specializations (Select all that apply)"
                     tags={specializationOptions}
-                    selected={formData.specializations}
-                    onChange={selected => setFormData(prev => ({ ...prev, specializations: selected }))}
+                    selected={formData.specialization}
+                    onChange={selected => setFormData(prev => ({ ...prev, specialization: selected }))}
                   />
                 </div>
 
                 {/* Description */}
-                <div>
+                {/* <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Professional Description *</label>
                   <div className="relative">
                     <FileText className="absolute left-4 top-4 w-5 h-5 text-gray-400" />
@@ -681,7 +714,7 @@ if (isSuccess) {
                       placeholder="Tell us about your experience, achievements, and what makes you a great broker..."
                     />
                   </div>
-                </div>
+                </div> */}
 
                 {/* Submit Button */}
                 <div className="pt-4">

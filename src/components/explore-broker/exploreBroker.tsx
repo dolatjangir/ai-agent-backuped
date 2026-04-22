@@ -21,32 +21,43 @@ import { motion, AnimatePresence } from 'framer-motion';
 interface Broker {
   id: string;
   name: string;
-  image: string;
+  image?: File | string;
   company: string;
   role: string;
-  location: string;
-  description: string;
+  city: string;
+  // description: string;
   email: string;
   phone: string;
   experience: string;
   specialization: string[] | any;
+    AddressLine1?: string;  
+  AddressLine2?: string;
   createdAt: string;
   updatedAt: string;
 }
 
 interface BrokerFormData {
   name: string;
-  image: string;
+  image?:  File |string;
   company: string;
   role: string;
-  location: string;
-  description: string;
+  city: string;
+  // description: string;
   email: string;
   phone: string;
   experience: string;
   specialization: string;
+   AddressLine1?: string;  
+  AddressLine2?: string;
+  removedAdminImages?: string[];
 }
-
+interface BrokerFormModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (data: BrokerFormData & { removedAdminImages?: string[] }) => void;
+  initialData?: Broker | null;
+  isEditing: boolean;
+}
 // Toast Notification Component
 const Toast = ({ message, type, onClose }: { message: string; type: 'success' | 'error'; onClose: () => void }) => {
   useEffect(() => {
@@ -144,10 +155,10 @@ const BrokerCard = ({
       
       <div className="flex items-center gap-2 text-gray-500 text-sm mb-3">
         <MapPin className="w-4 h-4" />
-        <span>{broker.location}</span>
+        <span>{broker.city}</span>
       </div>
       
-      <p className="text-gray-600 text-sm line-clamp-2">{broker.description}</p>
+      {/* <p className="text-gray-600 text-sm line-clamp-2">{broker.description}</p> */}
       
       <div className="mt-4 pt-4 border-t border-gray-100">
         <div className="flex flex-wrap gap-2">
@@ -224,7 +235,7 @@ const BrokerDetailModal = ({
               <div className="grid md:grid-cols-2 gap-6">
                 <div>
                   <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">About</h3>
-                  <p className="text-gray-700 leading-relaxed mb-6">{broker.description}</p>
+                  {/* <p className="text-gray-700 leading-relaxed mb-6">{broker.description}</p> */}
                   
                   <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Specialization</h3>
                   <div className="flex flex-wrap gap-2 mb-6">
@@ -260,7 +271,7 @@ const BrokerDetailModal = ({
                       
                       <div className="flex items-center gap-3 text-gray-700">
                         <MapPin className="w-5 h-5 text-[var(--color-primary-600)]" />
-                        <span>{broker.location}</span>
+                        <span>{broker.city}</span>
                       </div>
                       
                       <div className="flex items-center gap-3 text-gray-700">
@@ -312,74 +323,96 @@ const BrokerFormModal = ({
     image: '',
     company: '',
     role: '',
-    location: '',
-    description: '',
+    city: '',
+    // description: '',
     email: '',
     phone: '',
     experience: '',
-    specialization: ''
+    specialization: '',
+    AddressLine1: '',        // Added
+  AddressLine2: ''
   });
 
   const [errors, setErrors] = useState<Partial<Record<keyof BrokerFormData, string>>>({});
+   const [removedImages, setRemovedImages] = useState<string[]>([]);
 
   useEffect(() => {
     if (initialData) {
       setFormData({
         name: initialData.name,
-        image: initialData.image,
-        company: initialData.company,
-        role: initialData.role,
-        location: initialData.location,
-        description: initialData.description,
-        email: initialData.email,
-        phone: initialData.phone,
-        experience: initialData.experience,
-        specialization: initialData.specialization.join(', ')
+      image: initialData.image || '',
+      company: initialData.company,
+      role: 'client_admin',
+      city: initialData.city,
+      email: initialData.email,
+      phone: initialData.phone || '',
+      experience: initialData.experience || '',
+      specialization: Array.isArray(initialData.specialization) 
+        ? initialData.specialization.join(', ') 
+        : initialData.specialization || '',
+      AddressLine1: initialData.AddressLine1 || '',
+      AddressLine2: initialData.AddressLine2 || ''
       });
     } else {
       setFormData({
         name: '',
         image: '',
         company: '',
-        role: '',
-        location: '',
-        description: '',
+        role: 'client_admin',
+        city: '',
+        // description: '',
         email: '',
         phone: '',
         experience: '',
-        specialization: ''
+        specialization: '',
+          AddressLine1: '',
+      AddressLine2: ''
+    
       });
     }
     setErrors({});
-  }, [initialData, isOpen]);
+     setRemovedImages([]);
+  }, [initialData, isOpen,isEditing]);
 
-  const validate = (): boolean => {
-    const newErrors: Partial<Record<keyof BrokerFormData, string>> = {};
-    
-    if (!formData.name.trim()) newErrors.name = 'Name is required';
-    if (!formData.email.trim()) newErrors.email = 'Email is required';
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) newErrors.email = 'Invalid email format';
-    if (!formData.company.trim()) newErrors.company = 'Company is required';
-    if (!formData.role.trim()) newErrors.role = 'Role is required';
-    
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+const validate = (): boolean => {
+  const newErrors: Partial<Record<keyof BrokerFormData, string>> = {};
+  
+  if (!formData.name.trim()) newErrors.name = 'Name is required';
+  if (!formData.email.trim()) newErrors.email = 'Email is required';
+  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) newErrors.email = 'Invalid email format';
+  if (!formData.company.trim()) newErrors.company = 'Company is required';
+  // Remove role validation (hardcoded)
+  // Remove description validation
+  
+  setErrors(newErrors);
+  return Object.keys(newErrors).length === 0;
+};
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (validate()) {
-      onSubmit(formData);
+      onSubmit({ ...formData, removedAdminImages: removedImages });
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-    if (errors[name as keyof BrokerFormData]) {
-      setErrors(prev => ({ ...prev, [name]: undefined }));
+ const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const { name, type } = e.target;
+  
+  if (type === 'file' && 'files' in e.target) {
+    const fileInput = e.target as HTMLInputElement;
+    const file = fileInput.files?.[0];
+    if (file) {
+      setFormData(prev => ({ ...prev, [name]: file }));
     }
-  };
+  } else {
+    const { value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  }
+  
+  if (errors[name as keyof BrokerFormData]) {
+    setErrors(prev => ({ ...prev, [name]: undefined }));
+  }
+};
 
   return (
     <AnimatePresence>
@@ -428,13 +461,33 @@ const BrokerFormModal = ({
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Profile Image URL</label>
                   <input
-                    type="url"
+                    type="file"
                     name="image"
-                    value={formData.image || ""}
-                    onChange={handleChange}
+                    accept="image/*"
+             onChange={handleChange}
                     className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:border-[var(--color-primary-500)] focus:ring-2 focus:ring-[var(--color-primary-200)] outline-none transition-all"
                     placeholder="https://example.com/image.jpg"
                   />
+                 {formData.image && typeof formData.image === 'string' && (
+    <div className="relative inline-block mb-3">
+      <img 
+        src={formData.image} 
+        alt="Current" 
+        className="w-24 h-24 object-cover rounded-lg border border-gray-200"
+      />
+      <button
+        type="button"
+        onClick={() => {
+          setRemovedImages(prev => [...prev, formData.image as string]);
+          setFormData(prev => ({ ...prev, image: '' }));
+        }}
+        className="absolute -top-2 -right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 shadow-sm"
+      >
+        <X className="w-3 h-3" />
+      </button>
+    </div>
+  )}
+ 
                 </div>
                 
                 <div>
@@ -457,6 +510,7 @@ const BrokerFormModal = ({
                     name="role"
                     value={formData.role}
                     onChange={handleChange}
+                    disabled
                     className={`w-full px-4 py-2.5 rounded-lg border ${errors.role ? 'border-red-500' : 'border-gray-200'} focus:border-[var(--color-primary-500)] focus:ring-2 focus:ring-[var(--color-primary-200)] outline-none transition-all`}
                     placeholder="Senior Broker"
                   />
@@ -464,11 +518,11 @@ const BrokerFormModal = ({
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
                   <input
                     type="text"
-                    name="location"
-                    value={formData.location}
+                    name="city"
+                    value={formData.city}
                     onChange={handleChange}
                     className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:border-[var(--color-primary-500)] focus:ring-2 focus:ring-[var(--color-primary-200)] outline-none transition-all"
                     placeholder="New York, NY"
@@ -523,8 +577,33 @@ const BrokerFormModal = ({
                     placeholder="Residential, Commercial, Luxury Homes"
                   />
                 </div>
+                <div>
+  <label className="block text-sm font-medium text-gray-700 mb-1">Address Line 1</label>
+  <input
+    type="text"
+    name="AddressLine1"
+    value={formData.AddressLine1 || ""}
+    onChange={handleChange}
+    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:border-[var(--color-primary-500)] focus:ring-2 focus:ring-[var(--color-primary-200)] outline-none transition-all"
+    placeholder="123 Main Street"
+  />
+</div>
+
+{/* Add Address Line 2 */}
+<div>
+  <label className="block text-sm font-medium text-gray-700 mb-1">Address Line 2</label>
+  <input
+    type="text"
+    name="AddressLine2"
+    value={formData.AddressLine2 || ""}
+    onChange={handleChange}
+    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:border-[var(--color-primary-500)] focus:ring-2 focus:ring-[var(--color-primary-200)] outline-none transition-all"
+    placeholder="Apt 4B"
+  />
+</div>
+
                 
-                <div className="md:col-span-2">
+                {/* <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
                   <textarea
                     name="description"
@@ -534,7 +613,7 @@ const BrokerFormModal = ({
                     className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:border-[var(--color-primary-500)] focus:ring-2 focus:ring-[var(--color-primary-200)] outline-none transition-all resize-none"
                     placeholder="Brief description about the broker..."
                   />
-                </div>
+                </div> */}
               </div>
             </form>
             
@@ -629,17 +708,42 @@ export default function BrokersPage() {
   const [editingBroker, setEditingBroker] = useState<Broker | null>(null);
   const [deletingBroker, setDeletingBroker] = useState<Broker | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-
   // Fetch brokers
   const fetchBrokers = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/brokers');
+      const response = await fetch('https://appapi.estateai.in/api/admin/all',{credentials:"include"});
       if (!response.ok) throw new Error('Failed to fetch brokers');
-      const data = await response.json();
-      setBrokers(data);
+      const result = await response.json();
+         console.log('API Response:', result);
+      const admins = result.admins || [];
+      const mappedBrokers = admins.map((admin: any) => ({
+      id: admin._id || admin.id,
+      name: admin.name,
+      email: admin.email,
+      role: admin.role,
+      city: admin.city || '',
+      company: admin.company || '',
+      phone: admin.phone || '',
+      experience: admin.experience || '',
+      specialization: admin.specialization 
+        ? (typeof admin.specialization === 'string' 
+            ? admin.specialization.split(',').map((s: string) => s.trim()).filter(Boolean)
+            : admin.specialization)
+        : [],
+      AddressLine1: admin.AddressLine1 || admin.AddresssLine1 || '',
+      AddressLine2: admin.AddressLine2 || admin.AddresssLine2 || '',
+       image: admin.AdminImage 
+    ? JSON.parse(admin.AdminImage)[0] 
+    : '',
+      createdAt: admin.createdAt,
+      updatedAt: admin.updatedAt
+    }));
+    
+    setBrokers(mappedBrokers);
     } catch (error) {
-      showToast('Failed to load brokers', 'error');
+    showToast('Failed to load brokers', 'error');
+    setBrokers([]);
     } finally {
       setLoading(false);
     }
@@ -647,6 +751,7 @@ export default function BrokersPage() {
 
   useEffect(() => {
     fetchBrokers();
+ 
   }, [fetchBrokers]);
 
   const showToast = (message: string, type: 'success' | 'error') => {
@@ -654,72 +759,152 @@ export default function BrokersPage() {
   };
 
   // CRUD Operations
-  const handleAddBroker = async (formData: BrokerFormData) => {
-    try {
-      const response = await fetch('/api/brokers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          specialization: formData.specialization.split(',').map(s => s.trim()).filter(Boolean)
-        })
-      });
-      
-      if (!response.ok) throw new Error('Failed to add broker');
-      
-      const newBroker = await response.json();
-      setBrokers(prev => [newBroker, ...prev]);
-      setIsFormModalOpen(false);
-      showToast('Broker added successfully', 'success');
-    } catch (error) {
-      showToast('Failed to add broker', 'error');
-    }
-  };
+const handleAddBroker = async (formData: BrokerFormData) => {
+  try {
+    // MUST use FormData for file uploads, NOT JSON
+    const formDataToSend = new FormData();
+    formDataToSend.append('name', formData.name);
+    formDataToSend.append('email', formData.email);
+    formDataToSend.append('password', 'defaultPassword123');
+    formDataToSend.append('role', 'client_admin');
+    formDataToSend.append('company', formData.company);
+    formDataToSend.append('city', formData.city || '');
+    formDataToSend.append('phone', formData.phone || '');
+    formDataToSend.append('experience', formData.experience || '');
+    formDataToSend.append('specialization', formData.specialization || '');
+    formDataToSend.append('AddressLine1', formData.AddressLine1 || '');
+    formDataToSend.append('AddressLine2', formData.AddressLine2 || '');
+    formDataToSend.append('status', 'active');
 
-  const handleEditBroker = async (formData: BrokerFormData) => {
-    if (!editingBroker) return;
+    // Append image FILE (not URL string)
+    if (formData.image && typeof formData.image !== 'string') {
+      formDataToSend.append('AdminImage', formData.image); // or 'AgentImage' - check your backend
+    }
+
+    const response = await fetch('https://appapi.estateai.in/api/admin/create', {
+      method: 'POST',
+      credentials: 'include',
+      // DO NOT set Content-Type header - browser sets it automatically with boundary
+      body: formDataToSend
+    });
     
-    try {
-      const response = await fetch(`/api/brokers/${editingBroker.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          specialization: formData.specialization.split(',').map(s => s.trim()).filter(Boolean)
-        })
-      });
-      
-      if (!response.ok) throw new Error('Failed to update broker');
-      
-      const updatedBroker = await response.json();
-      setBrokers(prev => prev.map(b => b.id === updatedBroker.id ? updatedBroker : b));
-      setIsFormModalOpen(false);
-      setEditingBroker(null);
-      showToast('Broker updated successfully', 'success');
-    } catch (error) {
-      showToast('Failed to update broker', 'error');
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Failed to add broker');
     }
-  };
-
-  const handleDeleteBroker = async () => {
-    if (!deletingBroker) return;
     
-    try {
-      const response = await fetch(`/api/brokers/${deletingBroker.id}`, {
-        method: 'DELETE'
-      });
-      
-      if (!response.ok) throw new Error('Failed to delete broker');
-      
-      setBrokers(prev => prev.filter(b => b.id !== deletingBroker.id));
-      setIsDeleteModalOpen(false);
-      setDeletingBroker(null);
-      showToast('Broker deleted successfully', 'success');
-    } catch (error) {
-      showToast('Failed to delete broker', 'error');
-    }
-  };
+    const result = await response.json();
+    console.log('Create response:', result); // DEBUG
+    
+    const newBroker: Broker = {
+      id: result.adminData?._id || result.adminData?.id || result.data?._id,
+      name: result.adminData?.name || formData.name,
+      email: result.adminData?.email || formData.email,
+      role: result.adminData?.role || 'client_admin',
+      city: result.adminData?.city || formData.city || '',
+      company: result.adminData?.company || formData.company || '',
+      phone: result.adminData?.phone || formData.phone || '',
+      experience: result.adminData?.experience || formData.experience || '',
+      specialization: result.adminData?.specialization 
+        ? (typeof result.adminData.specialization === 'string' 
+            ? result.adminData.specialization.split(',').map((s: string) => s.trim()).filter(Boolean)
+            : result.adminData.specialization)
+        : [],
+      AddressLine1: result.adminData?.AddresssLine1 || result.adminData?.AddressLine1 || '',
+      AddressLine2: result.adminData?.AddresssLine2 || result.adminData?.AddressLine2 || '',
+      // Try multiple possible field names
+      image: result.adminData?.AdminImage 
+        || result.adminData?.AgentImage 
+        || result.adminData?.image 
+        || (formData.image && typeof formData.image === 'string' ? formData.image : ''),
+      createdAt: result.adminData?.createdAt || new Date().toISOString(),
+      updatedAt: result.adminData?.updatedAt || new Date().toISOString()
+    };
+    
+    setBrokers(prev => [newBroker, ...prev]);
+    setIsFormModalOpen(false);
+    showToast(result.message || 'Broker added successfully', 'success');
+    
+    // Refresh the list to get the correct image URL from server
+    fetchBrokers();
+  } catch (error: any) {
+    showToast(error.message || 'Failed to add broker', 'error');
+  }
+};
 
+ const handleEditBroker = async (formData: BrokerFormData & { removedAdminImages?: string[] }) => {
+  if (!editingBroker) return;
+  
+  try {
+    const formDataToSend = new FormData();
+    
+    // Append all text fields
+    formDataToSend.append('name', formData.name);
+    formDataToSend.append('email', formData.email);
+    formDataToSend.append('company', formData.company);
+    formDataToSend.append('city', formData.city || '');
+    formDataToSend.append('phone', formData.phone || '');
+    formDataToSend.append('experience', formData.experience || '');
+    formDataToSend.append('specialization', formData.specialization || '');
+    formDataToSend.append('AddressLine1', formData.AddressLine1 || '');
+    formDataToSend.append('AddressLine2', formData.AddressLine2 || '');
+    
+    // Append removed images if any
+    if (formData.removedAdminImages && formData.removedAdminImages.length > 0) {
+      formData.removedAdminImages.forEach((url) => {
+        formDataToSend.append('removedAdminImages', url);
+      });
+    }
+    
+    // Append new image file if uploaded
+    if (formData.image && typeof formData.image !== 'string') {
+      formDataToSend.append('AdminImage', formData.image);
+    }
+
+    const response = await fetch(`https://appapi.estateai.in/api/admin/${editingBroker.id}/details`, {
+      method: 'PUT', // or POST - check your API
+      credentials: 'include',
+      body: formDataToSend
+    });
+    
+    if (!response.ok) throw new Error('Failed to update broker');
+    
+    const result = await response.json();
+    
+    // Refresh list to get updated data from server
+    fetchBrokers();
+    
+    setIsFormModalOpen(false);
+    setEditingBroker(null);
+    showToast('Broker updated successfully', 'success');
+  } catch (error: any) {
+    showToast(error.message || 'Failed to update broker', 'error');
+  }
+};
+
+const handleDeleteBroker = async () => {
+  if (!deletingBroker) return;
+  
+  try {
+    const response = await fetch(`https://appapi.estateai.in/api/admin/${deletingBroker.id}`, {
+      method: 'DELETE',
+      credentials: 'include'  // Important for cookies/auth
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Failed to delete broker');
+    }
+    
+    // Remove from local state immediately for fast UI
+    setBrokers(prev => prev.filter(b => b.id !== deletingBroker.id));
+    setIsDeleteModalOpen(false);
+    setDeletingBroker(null);
+    showToast('Broker deleted successfully', 'success');
+  } catch (error: any) {
+    showToast(error.message || 'Failed to delete broker', 'error');
+  }
+};
   const openAddModal = () => {
     setEditingBroker(null);
     setIsFormModalOpen(true);
@@ -746,7 +931,7 @@ export default function BrokersPage() {
   const filteredBrokers = brokers.filter(broker => 
     broker.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     broker.company.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    broker.location.toLowerCase().includes(searchQuery.toLowerCase())
+    broker.city.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
